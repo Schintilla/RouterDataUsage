@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZTE Router Usage Tracker</title>
+  <script src="/js/chart.js"></script>
+  <script src="/js/chartjs-plugin-annotation.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 2rem; background: #f8fafc; color: #1e293b; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+    .header-area { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    h2 { margin: 0; color: #0f172a; font-size: 1.75rem; display: flex; align-items: center; gap: 10px; }
+    
+    .scrape-btn { padding: 10px 20px; font-weight: 600; font-size: 0.9rem; color: white; background: #2563eb; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 8px; }
+    .scrape-btn:hover { background: #1d4ed8; }
+    .scrape-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    .metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .metric-card { background: #f1f5f9; padding: 1.5rem; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .metric-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700; margin-bottom: 0.5rem; }
+    .metric-value { font-size: 2rem; font-weight: 800; color: #0f172a; }
+    .metric-subtext { font-size: 0.85rem; color: #64748b; margin-top: 0.25rem; }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 2rem; background: #f1f5f9; padding: 4px; border-radius: 8px; width: fit-content; }
+    .tab-btn { padding: 8px 16px; border: none; background: transparent; cursor: pointer; border-radius: 6px; font-weight: 600; color: #64748b; transition: all 0.2s; }
+    .tab-btn.active { background: white; color: #0f172a; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    
+    .chart-container { position: relative; height: 450px; width: 100%; }
+    .alert-banner { display: none; margin-bottom: 1.5rem; padding: 1rem; background: #fef2f2; border-left: 4px solid #ef4444; color: #991b1b; border-radius: 4px; font-weight: 500; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header-area">
+      <h2>🌐 ZTE 7d2885 Data Tracker</h2>
+      <div style="display: flex; gap: 10px;">
+        <button id="scrapeBtn" class="scrape-btn" onclick="triggerManualScrape()">
+          🔄 Refresh Live Data
+        </button>
+        <button class="scrape-btn" style="background: #ef4444;" onclick="triggerApplicationShutdown()">
+          🛑 Close Application
+        </button>
+      </div>
+    </div>
+    
+    <div id="quotaAlert" class="alert-banner">
+      ⚠️ Speed Throttled: Fair Usage Policy (FUP) limit exceeded. Data transfer speed has dropped from 50 Mbps down to 1 Mbps!
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-card" style="border-left: 5px solid #2563eb;">
+        <div class="metric-title">Actual Amount (Current)</div>
+        <div id="actualTotalDisplay" class="metric-value">0.00 GB</div>
+        <div id="lastUpdatedDisplay" class="metric-subtext">No logs generated yet</div>
+      </div>
+      <div class="metric-card" style="border-left: 5px solid #64748b;">
+        <div class="metric-title">Threshold Limit</div>
+        <div class="metric-value">450.00 GB</div>
+        <div class="metric-subtext">Monthly throttling point</div>
+      </div>
+      <div class="metric-card" id="excessCard" style="border-left: 5px solid #16a34a;">
+        <div class="metric-title">Exceeded Margin</div>
+        <div id="excessDisplay" class="metric-value">0.00 GB</div>
+        <div id="statusText" class="metric-subtext">Within safe profile speeds</div>
+      </div>
+      <div class="metric-card" id="forecastCard" style="border-left: 5px solid #eab308;">
+        <div class="metric-title">Forecasted Month-End</div>
+        <div id="forecastDisplay" class="metric-value">0.00 GB</div>
+        <div id="forecastStatusText" class="metric-subtext">Calculating tracking pace...</div>
+      </div>
+    </div>
+    
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchView('daily', event)">Daily Increments</button>
+      <button class="tab-btn" onclick="switchView('weekly', event)">Weekly Increments</button>
+      <button class="tab-btn" onclick="switchView('monthly', event)">Monthly Peaks</button>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="usageChart"></canvas>
+    </div>
+  </div>
+  <script>
+    let processedData = null;
+    let myChart = null;
+    let currentActiveTab = 'daily';
+
+    async function fetchData() {
+      try {
+        const response = await fetch('/api/usage');
+        processedData = await response.json();
+        
+        if (processedData && processedData.latestRaw) {
+          const currentReadingGB = processedData.latestRaw.total_bytes / (1000 * 1000 * 1000);
+          
+          let displayedTotalText = currentReadingGB.toFixed(2) + " GB";
+          if (currentReadingGB >= 1000) {
+            displayedTotalText = (currentReadingGB / 1000).toFixed(2) + " TB";
+          }
+          
+          document.getElementById('actualTotalDisplay').innerText = displayedTotalText;
+          document.getElementById('lastUpdatedDisplay').innerText = "Last updated: " + processedData.latestRaw.date;
+          
+          const allowanceLimitGB = 450;
+          const excessDataGB = currentReadingGB - allowanceLimitGB;
+          const excessCard = document.getElementById('excessCard');
+          
+          if (excessDataGB > 0) {
+            let displayedExcessText = excessDataGB.toFixed(2) + " GB";
+            if (excessDataGB >= 1000) {
+              displayedExcessText = (excessDataGB / 1000).toFixed(2) + " TB";
+            }
+            document.getElementById('excessDisplay').innerText = displayedExcessText;
+            document.getElementById('statusText').innerText = "Throttled at 1 Mbps speed link";
+            excessCard.style.borderLeftColor = "#ef4444";
+            document.getElementById('quotaAlert').style.display = 'block';
+          } else {
+            document.getElementById('excessDisplay').innerText = "0.00 GB";
+            document.getElementById('statusText').innerText = "Running full 50 Mbps line profile";
+            excessCard.style.borderLeftColor = "#16a34a";
+            document.getElementById('quotaAlert').style.display = 'none';
+          }
+
+          const predictedGB = processedData.predictionGB || 0;
+          const forecastCard = document.getElementById('forecastCard');
+          let displayedForecastText = predictedGB.toFixed(2) + " GB";
+          if (predictedGB >= 1000) {
+            displayedForecastText = (predictedGB / 1000).toFixed(2) + " TB";
+          }
+          document.getElementById('forecastDisplay').innerText = displayedForecastText;
+
+          if (predictedGB > allowanceLimitGB) {
+            document.getElementById('forecastStatusText').innerText = "⚠️ On track to exceed cap!";
+            forecastCard.style.borderLeftColor = "#ef4444";
+          } else {
+            document.getElementById('forecastStatusText').innerText = "✅ On track to stay within cap";
+            forecastCard.style.borderLeftColor = "#16a34a";
+          }
+        }
+        
+        renderView(currentActiveTab);
+      } catch (err) {
+        console.error("Error reading records:", err);
+      }
+    }
+
+    async function triggerManualScrape() {
+      const btn = document.getElementById('scrapeBtn');
+      btn.disabled = true;
+      btn.innerText = "⚡ Scraping Router Data...";
+      try {
+        const response = await fetch('/api/scrape-now');
+        const result = await response.json();
+        if (result.success) await fetchData();
+        else alert("Scraping failed: " + result.message);
+      } catch (err) {
+        alert("Could not reach backend scraper server.");
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "🔄 Refresh Live Data";
+      }
+    }
+
+    async function triggerApplicationShutdown() {
+      if (!confirm("Stop the tracker server and close the interface?")) return;
+      try {
+        const response = await fetch('/api/shutdown', { method: 'POST' });
+        const result = await response.json();
+        if (result.success) window.close();
+      } catch (err) {
+        alert("Failed to communicate exit routine.");
+      }
+    }
+
+    function renderChart(labels, datasets, title, thresholdValue, thresholdLabel) {
+      const ctx = document.getElementById('usageChart').getContext('2d');
+      if (myChart) myChart.destroy();
+      
+      myChart = new Chart(ctx, {
+        type: 'bar', 
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Data Used (GB)', font: { weight: 'bold' } },
+              suggestedMax: thresholdValue * 1.3
+            }
+          },
+          plugins: {
+            title: { display: true, text: title, font: { size: 16 } },
+            annotation: {
+              annotations: {
+                thresholdLine: {
+                  type: 'line',
+                  yMin: thresholdValue,
+                  yMax: thresholdValue,
+                  borderColor: '#ef4444',
+                  borderWidth: 3,
+                  label: {
+                    display: true,
+                    content: thresholdLabel + ": " + thresholdValue.toFixed(1) + " GB",
+                    position: 'end',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    font: { weight: 'bold', size: 11 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function switchView(type, event) {
+      currentActiveTab = type;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (event) event.target.classList.add('active');
+      renderView(type);
+    }
+
+    function renderView(type) {
+      if (!processedData || !processedData.daily || processedData.daily.length === 0) {
+        renderChart([], [], 'No logged history. Click Refresh above!', 15, 'Daily Average Limit');
+        return;
+      }
+
+      if (type === 'daily') {
+        const labels = processedData.daily.map(item => item.date);
+        const dataPoints = processedData.daily.map(item => item.usageGB);
+
+        renderChart(labels, [{
+          label: 'Data Consumed Today (GB)',
+          data: dataPoints,
+          backgroundColor: '#2563eb',
+          borderRadius: 4
+        }], 'Actual Daily Increments', 15.0, 'Daily FUP Budget');
+        
+      } else if (type === 'weekly') {
+        const labels = processedData.weekly.map(item => item.label);
+        const dataPoints = processedData.weekly.map(item => item.usageGB);
+
+        renderChart(labels, [{
+          label: 'Data Consumed This Week (GB)',
+          data: dataPoints,
+          backgroundColor: '#16a34a',
+          borderRadius: 4
+        }], 'Actual Weekly Increments', 105.0, 'Weekly FUP Budget');
+        
+      } else if (type === 'monthly') {
+        const labels = processedData.monthly.map(item => item.label);
+        const dataPoints = processedData.monthly.map(item => item.usageGB);
+
+        renderChart(labels, [{
+          label: 'Peak Absolute Usage (GB)',
+          data: dataPoints,
+          backgroundColor: '#7c3aed',
+          borderRadius: 4
+        }], 'Monthly Billing Cycle Totals', 450.0, 'Monthly FUP Ceiling');
+      }
+    }
+
+    fetchData();
+  </script>
+</body>
+</html>
