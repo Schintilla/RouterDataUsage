@@ -5,7 +5,8 @@ title ZTE Router Tracker Launcher
 taskkill /f /im node.exe >nul 2>&1
 
 :: 📁 Step 2: Navigate to your project directory
-cd /d "C:\Users\cyber\Downloads\router-tracker"
+rem cd /d "C:\Users\cyber\Downloads\router-tracker"
+cd /d "%~dp0router-tracker"
 
 :: 🚀 Step 3: Spin up the web application engine quietly in the background
 start /b node server.js
