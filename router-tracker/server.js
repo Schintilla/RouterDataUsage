@@ -16,12 +16,11 @@ app.use('/js/chartjs-plugin-annotation.js', express.static(__dirname + '/node_mo
 
 function getDaysArray(start, end) {
   const arr = [];
-  const dt = new Date(start);
-  const endDt = new Date(end);
+  const dt = new Date(start + "T12:00:00");
+  const endDt = new Date(end + "T12:00:00");
+  
   while (dt <= endDt) {
-    const isoString = new Date(dt).toISOString();
-    const cleanDateOnly = isoString.split('T')[0];
-    arr.push(cleanDateOnly);
+    arr.push(dt.toISOString().split('T')[0]);
     dt.setDate(dt.getDate() + 1);
   }
   return arr;
@@ -29,7 +28,7 @@ function getDaysArray(start, end) {
 
 function getWeekNumber(dateStr) {
   try {
-    const dateObj = new Date(dateStr + "T00:00:00");
+    const dateObj = new Date(dateStr + "T12:00:00");
     const startOfYear = new Date(dateObj.getFullYear(), 0, 1);
     const pastDaysOfYear = (dateObj - startOfYear) / 86400000;
     return String(Math.floor((pastDaysOfYear + startOfYear.getDay() + 1) / 7)).padStart(2, '0');
@@ -38,20 +37,15 @@ function getWeekNumber(dateStr) {
   }
 }
 
-// 🛠️ NEW HELPER: Translates "YYYY-MM-DD" into "DD-MMM-YY" (e.g., "17-Oct-26")
-function formatToDdMmmYy(dateStr) {
+function formatToDdMmm(dateStr) {
   try {
     const parts = dateStr.split('-');
     if (parts.length !== 3) return dateStr;
-    
-    const yearShort = parts[0].substring(2); // Extracts "26" from "2026"
     const day = parts[2];
-    
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const monthIndex = parseInt(parts[1], 10) - 1;
     const monthText = months[monthIndex] || "Jan";
-    
-    return `${day}-${monthText}-${yearShort}`;
+    return `${day}-${monthText}`;
   } catch (e) {
     return dateStr;
   }
@@ -60,19 +54,19 @@ function formatToDdMmmYy(dateStr) {
 app.get('/api/usage', (req, res) => {
   try {
     const rawRows = csvEngine.readAll() || [];
-    if (rawRows.length === 0) {
+    const cleanRows = rawRows.filter(row => row.date && !isNaN(row.total_bytes) && row.total_bytes > 0 && row.date.length === 10);
+    
+    if (cleanRows.length === 0) {
       return res.json({ daily: [], weekly: [], monthly: [], predictionGB: 0, latestRaw: null });
     }
     
-    const chronologicalRows = [...rawRows].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const chronologicalRows = [...cleanRows].sort((a, b) => a.date.localeCompare(b.date));
     const filledDailyData = [];
     
     for (let i = 0; i < chronologicalRows.length; i++) {
       const currentEntry = chronologicalRows[i];
-      if (!currentEntry.date || isNaN(currentEntry.total_bytes)) continue;
-      
       const currentGB = currentEntry.total_bytes / 1e9;
-      const cleanDateStr = String(currentEntry.date).trim();
+      const cleanDateStr = currentEntry.date;
       const extractedMonth = cleanDateStr.substring(0, 7);
       
       if (i === 0) {
@@ -87,8 +81,8 @@ app.get('/api/usage', (req, res) => {
       }
       
       const prevEntry = chronologicalRows[i - 1];
-      const dateStart = new Date(prevEntry.date + "T00:00:00");
-      const dateEnd = new Date(currentEntry.date + "T00:00:00");
+      const dateStart = new Date(prevEntry.date + "T12:00:00");
+      const dateEnd = new Date(currentEntry.date + "T12:00:00");
       
       const timeDiff = dateEnd - dateStart;
       const daysGap = Math.round(timeDiff / (1000 * 60 * 60 * 24));
@@ -99,21 +93,20 @@ app.get('/api/usage', (req, res) => {
       
       if (daysGap > 1 && daysGap < 365) {
         const averageUsagePerDayGB = totalDeltaGB / daysGap;
-        const missingDates = getDaysArray(new Date(dateStart.getTime() + 86400000), dateEnd);
+        const nextDay = new Date(dateStart.getTime() + 86400000).toISOString().split('T')[0];
+        const missingDates = getDaysArray(nextDay, currentEntry.date);
         
         missingDates.forEach((gapDate) => {
           const stepIndex = missingDates.indexOf(gapDate) + 1;
           let calculatedAbsoluteGB = (prevEntry.total_bytes / 1e9) + (averageUsagePerDayGB * stepIndex);
           if (deltaBytes < 0) calculatedAbsoluteGB = averageUsagePerDayGB * stepIndex; 
           
-          const cleanGapDateStr = String(gapDate);
-          
           filledDailyData.push({
-            date: cleanGapDateStr,
+            date: gapDate,
             usageGB: parseFloat(averageUsagePerDayGB.toFixed(2)),
             absoluteTotalGB: parseFloat(calculatedAbsoluteGB.toFixed(2)),
-            week_num: getWeekNumber(cleanGapDateStr),
-            month_num: cleanGapDateStr.substring(0, 7)
+            week_num: getWeekNumber(gapDate),
+            month_num: gapDate.substring(0, 7)
           });
         });
       } else {
@@ -147,37 +140,43 @@ app.get('/api/usage', (req, res) => {
     
     const monthlyData = Object.keys(monthlyMap).sort().map(month => {
       const record = monthlyMap[month];
-      const dateObj = new Date(record.date + "T00:00:00");
-      const labelStr = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+      const dateObj = new Date(record.date + "T12:00:00");
       return {
-        label: labelStr,
+        label: dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }),
         usageGB: record.absoluteTotalGB
       };
     });
 
+    // 🔮 FIX: Enforce clean day string boundaries to account for the remaining calendar days
     let forecastPredictionGB = 0;
     if (filledDailyData.length > 0) {
       const latestEntry = filledDailyData[filledDailyData.length - 1];
-      const activeMonthToken = String(latestEntry.month_num);
-      const currentMonthLogs = filledDailyData.filter(item => String(item.month_num) === activeMonthToken);
+      const activeMonthToken = latestEntry.month_num;
+      const currentMonthLogs = filledDailyData.filter(item => item.month_num === activeMonthToken);
       
       if (currentMonthLogs.length > 0) {
         const currentMonthUsageMaxGB = currentMonthLogs[currentMonthLogs.length - 1].absoluteTotalGB;
-        const activeDateObj = new Date(latestEntry.date + "T00:00:00");
-        const daysPassedInMonth = activeDateObj.getDate(); 
+        
+        // Isolate calendar fields via string array index to eliminate timezone slips
+        const dateStringParts = latestEntry.date.split('-');
+        const daysPassedInMonth = parseInt(dateStringParts[2], 10); 
+        
+        const referenceYear = parseInt(dateStringParts[0], 10);
+        const referenceMonth = parseInt(dateStringParts[1], 10);
+        const totalDaysInThisMonth = new Date(referenceYear, referenceMonth, 0).getDate(); 
+
         const averageBurnRatePerDay = currentMonthUsageMaxGB / (daysPassedInMonth || 1);
-        forecastPredictionGB = parseFloat((averageBurnRatePerDay * 30).toFixed(2));
+        forecastPredictionGB = parseFloat((averageBurnRatePerDay * totalDaysInThisMonth).toFixed(2));
       }
     }
 
-    // Apply the clean dd-mmm-yy visual translation transformation exclusively to daily labels
     const formattedDailyList = filledDailyData.map(item => ({
-      date: formatToDdMmmYy(item.date),
+      date: formatToDdMmm(item.date),
       usageGB: item.usageGB
     }));
 
     res.json({
-      daily: formattedDailyList.slice(-14),
+      daily: formattedDailyList.slice(-30), 
       weekly: weeklyData.slice(-6),
       monthly: monthlyData.slice(-12),
       predictionGB: forecastPredictionGB,
@@ -192,9 +191,9 @@ app.get('/api/usage', (req, res) => {
 
 const job = new cron.CronJob('55 23 * * *', async () => {
   const data = await scrapeRouterData();
-  if (data) {
-    const today = new Date().toISOString().split('T')[0];
-    csvEngine.saveEntry(today, data.total);
+  if (data && data.total > 0) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    csvEngine.saveEntry(todayStr, data.total);
   }
 });
 job.start();
@@ -203,9 +202,9 @@ app.get('/', (req, res) => { res.render('dashboard'); });
 
 app.get('/api/scrape-now', async (req, res) => {
   const data = await scrapeRouterData();
-  if (data) {
-    const today = new Date().toISOString().split('T')[0];
-    csvEngine.saveEntry(today, data.total);
+  if (data && data.total > 0) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    csvEngine.saveEntry(todayStr, data.total);
     return res.json({ success: true, message: "Scrape successful!", data });
   }
   res.status(500).json({ success: false, message: "Scrape routine failed." });
