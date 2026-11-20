@@ -2,83 +2,233 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ZTE Router Usage Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZTE G5TS Data Tracker</title>
+  <style>
+    :root {
+      --bg-primary: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --success-hover: #15803d;
+      --danger: #dc2626;
+      --border: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      color: var(--text-main);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    button {
+      padding: 0.625rem 1.25rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      border: none;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-success {
+      background-color: var(--success);
+      color: white;
+    }
+
+    .btn-success:hover {
+      background-color: var(--success-hover);
+    }
+
+    .btn-danger {
+      background-color: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background-color: #b91c1c;
+    }
+
+    .alert-banner {
+      display: none;
+      background-color: #fee2e2;
+      border-left: 4px solid var(--danger);
+      color: #991b1b;
+      padding: 1rem;
+      border-radius: 0.375rem;
+      margin-bottom: 2rem;
+      font-weight: 500;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .card-title {
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .card-value {
+      font-size: 2.25rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .card-status {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .chart-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+    }
+
+    .tab-btn {
+      background: none;
+      color: var(--text-muted);
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      background-color: #eff6ff;
+      color: var(--primary);
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 400px;
+      width: 100%;
+    }
+  </style>
   <script src="/js/chart.js"></script>
   <script src="/js/chartjs-plugin-annotation.js"></script>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 2rem; background: #f8fafc; color: #1e293b; }
-    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
-    .header-area { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-    h2 { margin: 0; color: #0f172a; font-size: 1.75rem; display: flex; align-items: center; gap: 10px; }
-    
-    .scrape-btn { padding: 10px 20px; font-weight: 600; font-size: 0.9rem; color: white; background: #2563eb; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 8px; }
-    .scrape-btn:hover { background: #1d4ed8; }
-    .scrape-btn:disabled { background: #94a3b8; cursor: not-allowed; }
-
-    .metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-    .metric-card { background: #f1f5f9; padding: 1.5rem; border-radius: 8px; border: 1px solid #e2e8f0; }
-    .metric-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700; margin-bottom: 0.5rem; }
-    .metric-value { font-size: 2rem; font-weight: 800; color: #0f172a; }
-    .metric-subtext { font-size: 0.85rem; color: #64748b; margin-top: 0.25rem; }
-
-    .tabs { display: flex; gap: 8px; margin-bottom: 2rem; background: #f1f5f9; padding: 4px; border-radius: 8px; width: fit-content; }
-    .tab-btn { padding: 8px 16px; border: none; background: transparent; cursor: pointer; border-radius: 6px; font-weight: 600; color: #64748b; transition: all 0.2s; }
-    .tab-btn.active { background: white; color: #0f172a; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    
-    .chart-container { position: relative; height: 450px; width: 100%; }
-    .alert-banner { display: none; margin-bottom: 1.5rem; padding: 1rem; background: #fef2f2; border-left: 4px solid #ef4444; color: #991b1b; border-radius: 4px; font-weight: 500; }
-  </style>
 </head>
 <body>
 
   <div class="container">
-    <div class="header-area">
-      <h2>🌐 ZTE 7d2885 Data Tracker</h2>
-      <div style="display: flex; gap: 10px;">
-        <button id="scrapeBtn" class="scrape-btn" onclick="triggerManualScrape()">
-          🔄 Refresh Live Data
-        </button>
-        <button class="scrape-btn" style="background: #ef4444;" onclick="triggerApplicationShutdown()">
-          🛑 Close Application
-        </button>
+    <header>
+      <div>
+        <h1>ZTE G5TS Data Tracker</h1>
       </div>
-    </div>
-    
+      <div class="btn-group">
+        <button id="scrapeBtn" class="btn-primary" onclick="triggerManualScrape()">🔄 Refresh Live Data</button>
+        <button class="btn-success" onclick="window.open('https://speedtest.net', '_blank')">🚀 Speed Test</button>
+        <button class="btn-danger" onclick="triggerApplicationShutdown()">🛑 Close Application</button>
+      </div>
+    </header>
+
     <div id="quotaAlert" class="alert-banner">
-      ⚠️ Speed Throttled: Fair Usage Policy (FUP) limit exceeded. Data transfer speed has dropped from 50 Mbps down to 1 Mbps!
+      ⚠️ Attention: Your line threshold profile has breached the 450 GB soft cap allocation limit!
     </div>
 
-    <div class="metrics-row">
-      <div class="metric-card" style="border-left: 5px solid #2563eb;">
-        <div class="metric-title">Actual Amount (Current)</div>
-        <div id="actualTotalDisplay" class="metric-value">0.00 GB</div>
-        <div id="lastUpdatedDisplay" class="metric-subtext">No logs generated yet</div>
+    <div class="grid">
+      <div id="actualCard" class="card">
+        <div class="card-title">Current Volume Target</div>
+        <div id="actualTotalDisplay" class="card-value">0.00 GB</div>
+        <div id="lastUpdatedDisplay" class="card-status">Loading latest parameters...</div>
       </div>
-      <div class="metric-card" style="border-left: 5px solid #64748b;">
-        <div class="metric-title">Threshold Limit</div>
-        <div class="metric-value">450.00 GB</div>
-        <div class="metric-subtext">Monthly throttling point</div>
+
+      <div id="remainingCard" class="card">
+        <div class="card-title">Amount Remaining</div>
+        <div id="remainingDisplay" class="card-value">450.00 GB</div>
+        <div id="remainingStatusText" class="card-status">Calculating daily budget...</div>
       </div>
-      <div class="metric-card" id="excessCard" style="border-left: 5px solid #16a34a;">
-        <div class="metric-title">Exceeded Margin</div>
-        <div id="excessDisplay" class="metric-value">0.00 GB</div>
-        <div id="statusText" class="metric-subtext">Within safe profile speeds</div>
+
+      <div id="forecastCard" class="card">
+        <div class="card-title">Forecasted Month-End</div>
+        <div id="forecastDisplay" class="card-value">0.00 GB</div>
+        <div id="forecastBasisText" class="card-status" style="margin-bottom: 0.25rem;">Calculating daily average...</div>
+        <div id="forecastStatusText" class="card-status" style="font-weight: 600;">Analyzing bandwidth pacing...</div>
       </div>
-      <div class="metric-card" id="forecastCard" style="border-left: 5px solid #eab308;">
-        <div class="metric-title">Forecasted Month-End</div>
-        <div id="forecastDisplay" class="metric-value">0.00 GB</div>
-        <div id="forecastStatusText" class="metric-subtext">Calculating tracking pace...</div>
-      </div>
-    </div>
-    
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchView('daily', event)">Daily Increments</button>
-      <button class="tab-btn" onclick="switchView('weekly', event)">Weekly Increments</button>
-      <button class="tab-btn" onclick="switchView('monthly', event)">Monthly Peaks</button>
     </div>
 
     <div class="chart-container">
-      <canvas id="usageChart"></canvas>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchView('daily', event)">Daily Profile</button>
+        <button class="tab-btn" onclick="switchView('weekly', event)">Weekly Summary</button>
+        <button class="tab-btn" onclick="switchView('monthly', event)">Monthly Cycle</button>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="usageChart"></canvas>
+      </div>
     </div>
   </div>
   <script>
@@ -92,49 +242,74 @@
         processedData = await response.json();
         
         if (processedData && processedData.latestRaw) {
-          const currentReadingGB = processedData.latestRaw.total_bytes / (1000 * 1000 * 1000);
+          // Binary standards conversion (1024^3)
+          const currentReadingGB = processedData.latestRaw.total_bytes / (1024 * 1024 * 1024);
           
           let displayedTotalText = currentReadingGB.toFixed(2) + " GB";
-          if (currentReadingGB >= 1000) {
-            displayedTotalText = (currentReadingGB / 1000).toFixed(2) + " TB";
+          if (currentReadingGB >= 1024) {
+            displayedTotalText = (currentReadingGB / 1024).toFixed(2) + " TB";
           }
           
           document.getElementById('actualTotalDisplay').innerText = displayedTotalText;
           document.getElementById('lastUpdatedDisplay').innerText = "Last updated: " + processedData.latestRaw.date;
           
+          // --- 1. AMOUNT REMAINING & DAILY BUDGET CALCULATION ---
           const allowanceLimitGB = 450;
-          const excessDataGB = currentReadingGB - allowanceLimitGB;
-          const excessCard = document.getElementById('excessCard');
+          const remainingDataGB = allowanceLimitGB - currentReadingGB;
+          const remainingCard = document.getElementById('remainingCard');
           
-          if (excessDataGB > 0) {
-            let displayedExcessText = excessDataGB.toFixed(2) + " GB";
-            if (excessDataGB >= 1000) {
-              displayedExcessText = (excessDataGB / 1000).toFixed(2) + " TB";
+          // Calculate remaining days in current calendar month (inclusive of today)
+          const now = new Date();
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const daysRemaining = Math.max(1, daysInMonth - now.getDate() + 1);
+
+          if (remainingDataGB > 0) {
+            let displayedRemainingText = remainingDataGB.toFixed(2) + " GB";
+            if (remainingDataGB >= 1024) {
+              displayedRemainingText = (remainingDataGB / 1024).toFixed(2) + " TB";
             }
-            document.getElementById('excessDisplay').innerText = displayedExcessText;
-            document.getElementById('statusText').innerText = "Throttled at 1 Mbps speed link";
-            excessCard.style.borderLeftColor = "#ef4444";
-            document.getElementById('quotaAlert').style.display = 'block';
-          } else {
-            document.getElementById('excessDisplay').innerText = "0.00 GB";
-            document.getElementById('statusText').innerText = "Running full 50 Mbps line profile";
-            excessCard.style.borderLeftColor = "#16a34a";
+            const dailyAllowanceGB = remainingDataGB / daysRemaining;
+            
+            document.getElementById('remainingDisplay').innerText = displayedRemainingText;
+            document.getElementById('remainingStatusText').innerText = `Daily use to be ${dailyAllowanceGB.toFixed(2)} GB to remain within cap`;
+            remainingCard.style.borderLeftColor = "#16a34a";
             document.getElementById('quotaAlert').style.display = 'none';
+          } else {
+            const overageGB = Math.abs(remainingDataGB);
+            document.getElementById('remainingDisplay').innerText = "0.00 GB";
+            document.getElementById('remainingStatusText').innerText = `Cap exceeded by ${overageGB.toFixed(2)} GB (Throttled at 1 Mbps)`;
+            remainingCard.style.borderLeftColor = "#ef4444";
+            document.getElementById('quotaAlert').style.display = 'block';
           }
 
+          // --- 2. FORECASTED MONTH-END & AVERAGE BASIS ---
           const predictedGB = processedData.predictionGB || 0;
           const forecastCard = document.getElementById('forecastCard');
           let displayedForecastText = predictedGB.toFixed(2) + " GB";
-          if (predictedGB >= 1000) {
-            displayedForecastText = (predictedGB / 1000).toFixed(2) + " TB";
+          if (predictedGB >= 1024) {
+            displayedForecastText = (predictedGB / 1024).toFixed(2) + " TB";
           }
           document.getElementById('forecastDisplay').innerText = displayedForecastText;
 
+          // Calculate average daily usage over logged days
+          const dailyList = processedData.daily || [];
+          const numDays = dailyList.length;
+          if (numDays > 0) {
+            const totalLoggedUsage = dailyList.reduce((sum, item) => sum + (item.usageGB || 0), 0);
+            const avgDailyGB = totalLoggedUsage / numDays;
+            const dayWord = numDays === 1 ? "day" : "days";
+            document.getElementById('forecastBasisText').innerText = `Based on an average daily use of ${avgDailyGB.toFixed(2)} GB over the past ${numDays} ${dayWord}`;
+          } else {
+            document.getElementById('forecastBasisText').innerText = "Not enough daily history yet";
+          }
+
           if (predictedGB > allowanceLimitGB) {
-            document.getElementById('forecastStatusText').innerText = "⚠️ On track to exceed cap!";
+            document.getElementById('forecastStatusText').innerText = "⚠️ Cap may be exceeded";
+            document.getElementById('forecastStatusText').style.color = "#dc2626";
             forecastCard.style.borderLeftColor = "#ef4444";
           } else {
             document.getElementById('forecastStatusText').innerText = "✅ On track to stay within cap";
+            document.getElementById('forecastStatusText').style.color = "#16a34a";
             forecastCard.style.borderLeftColor = "#16a34a";
           }
         }
@@ -233,10 +408,20 @@
         const labels = processedData.daily.map(item => item.date);
         const dataPoints = processedData.daily.map(item => item.usageGB);
 
+        // Highlight columns in the current month in green (#16a34a), prior month in blue (#2563eb)
+        const now = new Date();
+        const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonthShort = now.toLocaleString('en-US', { month: 'short' });
+
+        const barColors = labels.map(dateStr => {
+          const isCurrentMonth = dateStr.startsWith(currentYearMonth) || dateStr.includes(currentMonthShort);
+          return isCurrentMonth ? '#16a34a' : '#2563eb';
+        });
+
         renderChart(labels, [{
-          label: 'Data Consumed Today (GB)',
+          label: 'Data Consumed Today (GB) — Green: Current Month',
           data: dataPoints,
-          backgroundColor: '#2563eb',
+          backgroundColor: barColors,
           borderRadius: 4
         }], 'Actual Daily Increments', 15.0, 'Daily FUP Budget');
         
